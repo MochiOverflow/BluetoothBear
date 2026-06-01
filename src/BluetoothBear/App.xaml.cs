@@ -18,6 +18,9 @@ public partial class App : Application
     private WinForms.NotifyIcon? _tray;
     private MainWindow? _window;
     private MainViewModel? _vm;
+    private WinForms.ToolStripMenuItem? _methodInApp;
+    private WinForms.ToolStripMenuItem? _methodSettings;
+    private WinForms.ToolStripMenuItem? _methodWizard;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -48,6 +51,14 @@ public partial class App : Application
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add("Open BluetoothBear", null, (_, _) => ShowFlyout());
         menu.Items.Add("Refresh now", null, async (_, _) => await (_vm?.RefreshAsync() ?? Task.CompletedTask));
+
+        var methodMenu = new WinForms.ToolStripMenuItem("Add a device using");
+        _methodInApp = AddMethodItem(methodMenu, "In-app (BluetoothBear)", PairingMethod.InApp);
+        _methodSettings = AddMethodItem(methodMenu, "Windows Settings", PairingMethod.WindowsSettings);
+        _methodWizard = AddMethodItem(methodMenu, "Classic Windows wizard", PairingMethod.ClassicWizard);
+        menu.Items.Add(methodMenu);
+        UpdateMethodChecks();
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => ExitApp());
 
@@ -66,6 +77,27 @@ public partial class App : Application
                 ToggleFlyout();
             }
         };
+    }
+
+    private WinForms.ToolStripMenuItem AddMethodItem(WinForms.ToolStripMenuItem parent, string text, PairingMethod method)
+    {
+        var item = new WinForms.ToolStripMenuItem(text);
+        item.Click += (_, _) =>
+        {
+            if (_vm is null) return;
+            _vm.PairingMethod = method;
+            UpdateMethodChecks();
+        };
+        parent.DropDownItems.Add(item);
+        return item;
+    }
+
+    private void UpdateMethodChecks()
+    {
+        if (_vm is null) return;
+        _methodInApp!.Checked = _vm.PairingMethod == PairingMethod.InApp;
+        _methodSettings!.Checked = _vm.PairingMethod == PairingMethod.WindowsSettings;
+        _methodWizard!.Checked = _vm.PairingMethod == PairingMethod.ClassicWizard;
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -101,6 +133,7 @@ public partial class App : Application
     private void HideFlyout()
     {
         if (_window is null || !_window.IsVisible) return;
+        _vm?.ExitDiscovery(); // stop the radio scan when the flyout closes
         _window.Hide();
         _lastHidden = DateTime.UtcNow;
     }

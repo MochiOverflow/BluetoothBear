@@ -15,6 +15,7 @@
         <conv:BatteryBrushConverter x:Key="BatteryBrush" />
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <conv:ErrorBrushConverter x:Key="ErrorBrush" />
 
         <!-- Pill button used inside cards and the header -->
         <Style x:Key="CardButton" TargetType="Button">
@@ -130,6 +131,31 @@
                 </StackPanel>
             </Border>
         </DataTemplate>
+
+        <!-- Discovered (unpaired) device row -->
+        <DataTemplate DataType="{x:Type vm:DiscoveredDeviceViewModel}">
+            <Border CornerRadius="10" Background="White" Margin="0,0,0,8" Padding="12,10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="1" Direction="270" Opacity="0.08" />
+                </Border.Effect>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding StatusText}" FontSize="11" Margin="0,2,0,0"
+                                   Foreground="{Binding IsError, Converter={StaticResource ErrorBrush}}"
+                                   Visibility="{Binding HasStatus, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Pair" Style="{StaticResource CardButton}"
+                            Background="#2563EB" Foreground="White" VerticalAlignment="Center"
+                            Command="{Binding PairCommand}" />
+                </Grid>
+            </Border>
+        </DataTemplate>
     </Window.Resources>
 
     <!-- Outer card: rounded, drop-shadowed; the 12px margin leaves room for the shadow. -->
@@ -157,14 +183,15 @@
                         Command="{Binding RefreshCommand}" />
             </Grid>
 
-            <!-- Pair a new device -->
+            <!-- Pair a new device (hidden while in the discovery view) -->
             <Button Grid.Row="1" Content="＋  Add a device" Style="{StaticResource CardButton}"
                     Background="#E8EFFE" Foreground="#2563EB"
                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                    Margin="16,0,16,10" Click="AddDevice_Click" />
+                    Margin="16,0,16,10" Command="{Binding BeginAddDeviceCommand}"
+                    Visibility="{Binding ShowDeviceList, Converter={StaticResource BoolToVis}}" />
 
-            <!-- Device list -->
-            <Grid Grid.Row="2">
+            <!-- Device list (paired) -->
+            <Grid Grid.Row="2" Visibility="{Binding ShowDeviceList, Converter={StaticResource BoolToVis}}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="380" Padding="16,2,16,2">
                     <ItemsControl ItemsSource="{Binding Devices}" />
                 </ScrollViewer>
@@ -172,10 +199,37 @@
                             Visibility="{Binding HasNoDevices, Converter={StaticResource BoolToVis}}">
                     <TextBlock Text="No paired devices found" FontSize="13" Foreground="#6B7280"
                                HorizontalAlignment="Center" />
-                    <TextBlock Text="Pair a device in Windows Bluetooth settings." FontSize="11"
+                    <TextBlock Text="Use ＋ Add a device to pair one." FontSize="11"
                                Foreground="#9CA3AF" Margin="0,4,0,0" HorizontalAlignment="Center" />
                 </StackPanel>
             </Grid>
+
+            <!-- Discovery view (in-app pairing) -->
+            <DockPanel Grid.Row="2" Visibility="{Binding IsDiscovering, Converter={StaticResource BoolToVis}}">
+                <Grid DockPanel.Dock="Top" Margin="16,0,16,6">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="←" Style="{StaticResource CardButton}"
+                                Background="#E5E7EB" Foreground="#374151" Padding="11,4"
+                                Command="{Binding CloseDiscoveryCommand}" />
+                        <TextBlock Text="Add a device" FontSize="14" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" Margin="10,0,0,0" />
+                    </StackPanel>
+                </Grid>
+                <StackPanel DockPanel.Dock="Top" Margin="16,0,16,8">
+                    <TextBlock Text="Searching for nearby devices…" FontSize="11" Foreground="#6B7280" />
+                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,6,0,0"
+                                 Background="#E5E7EB" Foreground="#2563EB" BorderThickness="0" />
+                </StackPanel>
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="300" Padding="16,2,16,4">
+                        <ItemsControl ItemsSource="{Binding Discovered}" />
+                    </ScrollViewer>
+                    <TextBlock Text="Put your device in pairing mode so it shows up here."
+                               Margin="20,12" FontSize="12" Foreground="#9CA3AF" TextWrapping="Wrap"
+                               HorizontalAlignment="Center" VerticalAlignment="Top" TextAlignment="Center"
+                               Visibility="{Binding HasNoDiscovered, Converter={StaticResource BoolToVis}}" />
+                </Grid>
+            </DockPanel>
 
             <!-- Footer -->
             <Border Grid.Row="3" BorderThickness="0,1,0,0" BorderBrush="#E3E5E9" Padding="16,9,16,12">

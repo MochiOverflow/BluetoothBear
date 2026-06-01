@@ -45,6 +45,19 @@ public sealed class BoolToVisibilityConverter : IValueConverter
         => value is Visibility.Visible;
 }
 
+/// <summary>true (is-error) → red, false → gray. For discovery status text.</summary>
+public sealed class ErrorBrushConverter : IValueConverter
+{
+    private static readonly Brush Error = new SolidColorBrush(Color.FromRgb(0xDC, 0x26, 0x26));
+    private static readonly Brush Normal = new SolidColorBrush(Color.FromRgb(0x6B, 0x72, 0x80));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? Error : Normal;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
 /// <summary>true → Collapsed, false → Visible.</summary>
 public sealed class InverseBoolToVisibilityConverter : IValueConverter
 {

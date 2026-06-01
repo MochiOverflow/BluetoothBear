@@ -1,9 +1,8 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using BluetoothBear.ViewModels;
 
 namespace BluetoothBear;
 
@@ -42,36 +41,19 @@ public partial class MainWindow : Window
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape)
+        if (e.Key != Key.Escape) return;
+
+        // Esc backs out of the discovery view first; otherwise it hides the flyout.
+        if (DataContext is MainViewModel { IsDiscovering: true } vm)
+        {
+            vm.CloseDiscoveryCommand.Execute(null);
+        }
+        else
         {
             Hide();
         }
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
-        => TryStart("ms-settings:bluetooth");
-
-    // Opens Windows' "Add a device" pairing wizard (direct to device discovery),
-    // falling back to the Bluetooth settings page if the wizard isn't present.
-    private void AddDevice_Click(object sender, RoutedEventArgs e)
-    {
-        var wizard = Path.Combine(Environment.SystemDirectory, "DevicePairingWizard.exe");
-        if (!File.Exists(wizard) || !TryStart(wizard))
-        {
-            TryStart("ms-settings:bluetooth");
-        }
-    }
-
-    private static bool TryStart(string target)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
+        => PairingLauncher.OpenWindowsSettings();
 }

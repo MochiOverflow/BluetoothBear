@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Threading;
+using Windows.Devices.Enumeration;
 using BluetoothBear.Bluetooth;
 
 namespace BluetoothBear.ViewModels;
@@ -13,18 +14,69 @@ public sealed class MainViewModel : ObservableObject
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
 
     private readonly DispatcherTimer _timer;
+    private readonly Dispatcher _dispatcher;
+    private readonly AppSettings _settings;
+    private readonly DeviceDiscovery _discovery = new();
     private bool _isRefreshing;
     private bool _anyConnected;
     private bool _startWithWindows;
+    private bool _isDiscovering;
     private string _statusSummary = "Loading…";
     private string _trayText = "BluetoothBear";
 
     public MainViewModel()
     {
-        RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsRefreshing);
+        _dispatcher = Dispatcher.CurrentDispatcher;
+        _settings = AppSettings.Load();
         _startWithWindows = StartupManager.IsEnabled();
+
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsRefreshing);
+        BeginAddDeviceCommand = new RelayCommand(BeginAddDevice);
+        CloseDiscoveryCommand = new RelayCommand(ExitDiscovery);
+
+        _discovery.DeviceAdded += OnDiscoveryAdded;
+        _discovery.DeviceUpdated += OnDiscoveryUpdated;
+        _discovery.DeviceRemoved += OnDiscoveryRemoved;
+
         _timer = new DispatcherTimer { Interval = RefreshInterval };
         _timer.Tick += async (_, _) => await RefreshAsync();
+    }
+
+    public ObservableCollection<DiscoveredDeviceViewModel> Discovered { get; } = [];
+
+    public RelayCommand BeginAddDeviceCommand { get; }
+
+    public RelayCommand CloseDiscoveryCommand { get; }
+
+    /// <summary>True while the flyout is showing the in-app "Add a device" discovery view.</summary>
+    public bool IsDiscovering
+    {
+        get => _isDiscovering;
+        private set
+        {
+            if (Set(ref _isDiscovering, value))
+            {
+                Raise(nameof(ShowDeviceList));
+            }
+        }
+    }
+
+    /// <summary>Inverse of <see cref="IsDiscovering"/>, for binding the normal list's visibility.</summary>
+    public bool ShowDeviceList => !_isDiscovering;
+
+    public bool HasNoDiscovered => Discovered.Count == 0;
+
+    /// <summary>Which "Add a device" experience the button triggers; persisted on change.</summary>
+    public PairingMethod PairingMethod
+    {
+        get => _settings.PairingMethod;
+        set
+        {
+            if (_settings.PairingMethod == value) return;
+            _settings.PairingMethod = value;
+            _settings.Save();
+            Raise();
+        }
     }
 
     /// <summary>Launch BluetoothBear at sign-in (HKCU Run key). Bound to the footer checkbox.</summary>
@@ -89,7 +141,102 @@ public sealed class MainViewModel : ObservableObject
         await RefreshAsync();
     }
 
-    public void Stop() => _timer.Stop();
+    public void Stop()
+    {
+        _timer.Stop();
+        _discovery.Stop();
+    }
+
+    private void BeginAddDevice()
+    {
+        switch (PairingMethod)
+        {
+            case PairingMethod.WindowsSettings:
+                PairingLauncher.OpenWindowsSettings();
+                break;
+            case PairingMethod.ClassicWizard:
+                PairingLauncher.OpenClassicWizard();
+                break;
+            default:
+                StartDiscovery();
+                break;
+        }
+    }
+
+    private void StartDiscovery()
+    {
+        Discovered.Clear();
+        Raise(nameof(HasNoDiscovered));
+        IsDiscovering = true;
+        _discovery.Start();
+    }
+
+    /// <summary>Leave the discovery view and stop the radio scan. Safe to call when not discovering.</summary>
+    public void ExitDiscovery()
+    {
+        if (!_isDiscovering) return;
+        _discovery.Stop();
+        IsDiscovering = false;
+        Discovered.Clear();
+        Raise(nameof(HasNoDiscovered));
+    }
+
+    private async Task PairAsync(DiscoveredDeviceViewModel device)
+    {
+        if (device.IsPairing) return;
+
+        device.IsPairing = true;
+        try
+        {
+            var status = await _discovery.PairAsync(device.Id);
+            if (status is DevicePairingResultStatus.Paired or DevicePairingResultStatus.AlreadyPaired)
+            {
+                ExitDiscovery();
+                await RefreshAsync(); // the newly paired device shows up in the main list
+            }
+            else
+            {
+                device.SetError(Describe(status));
+                device.IsPairing = false;
+            }
+        }
+        catch
+        {
+            device.SetError("Pairing failed");
+            device.IsPairing = false;
+        }
+    }
+
+    private static string Describe(DevicePairingResultStatus status) => status switch
+    {
+        DevicePairingResultStatus.PairingCanceled => "Pairing canceled",
+        DevicePairingResultStatus.AuthenticationFailure => "Authentication failed",
+        DevicePairingResultStatus.ConnectionRejected => "Connection rejected",
+        DevicePairingResultStatus.AccessDenied => "Access denied",
+        DevicePairingResultStatus.NotReadyToPair => "Device not ready",
+        _ => "Couldn't pair",
+    };
+
+    // Watcher callbacks arrive off the UI thread — marshal before touching the collection.
+    private void OnDiscoveryAdded(DiscoveredDevice device) => _dispatcher.BeginInvoke(() =>
+    {
+        if (Discovered.Any(x => x.Id == device.Id)) return;
+        Discovered.Add(new DiscoveredDeviceViewModel(device, PairAsync));
+        Raise(nameof(HasNoDiscovered));
+    });
+
+    private void OnDiscoveryUpdated(DiscoveredDevice device) => _dispatcher.BeginInvoke(() =>
+        Discovered.FirstOrDefault(x => x.Id == device.Id)?.Apply(device));
+
+    private void OnDiscoveryRemoved(string id) => _dispatcher.BeginInvoke(() =>
+    {
+        var existing = Discovered.FirstOrDefault(x => x.Id == id);
+        if (existing is not null)
+        {
+            Discovered.Remove(existing);
+            Raise(nameof(HasNoDiscovered));
+        }
+    });
 
     public async Task RefreshAsync()
     {

@@ -13,8 +13,10 @@ not a full window. **Left-click** the tray icon to toggle the flyout; click away
 - A flyout with a card per paired Bluetooth device (classic + BLE) and a connected (green) /
   disconnected (gray) status dot.
 - **Connect / Disconnect** button per device (classic audio via `BluetoothSetServiceState`).
-- **Add a device** button that opens Windows' pairing wizard (`DevicePairingWizard.exe`,
-  falling back to the Bluetooth settings page) to pair new devices.
+- **Add a device** button with **in-app discovery & pairing** — finds nearby unpaired
+  devices live inside the flyout and pairs them with one click (no external window). The
+  method is selectable from the tray menu: **In-app** (default), **Windows Settings**, or
+  the **Classic wizard**; the choice persists.
 - Shows **battery %** with a colored bar when the device reports it (Windows 11 PnP
   property for classic headsets; GATT Battery Service for BLE). Best-effort — not every
   device reports battery.
@@ -34,7 +36,11 @@ not a full window. **Left-click** the tray icon to toggle the flyout; click away
   and `DeviceViewModel` (status/battery/toggle command).
 - **Bluetooth** (`Bluetooth/`): UI-agnostic services — `DeviceEnumerator` (WinRT),
   `ConnectionController` (Win32 P/Invoke), `PnpBatteryReader` (PnP tree scan for classic
-  headset battery), `BatteryReader` (BLE GATT fallback).
+  headset battery), `BatteryReader` (BLE GATT fallback), `DeviceDiscovery` (live
+  `DeviceWatcher` scan for unpaired devices + custom `PairAsync`).
+- **Settings**: `AppSettings` (JSON in `%APPDATA%\BluetoothBear\settings.json`) holds the
+  pairing-method preference; `StartupManager` handles the HKCU Run key; `PairingLauncher`
+  opens the external Windows pairing UIs.
 
 ### How battery reading works
 
