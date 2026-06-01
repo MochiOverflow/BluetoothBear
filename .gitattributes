@@ -1,0 +1,11 @@
+# Normalize all text files to LF in the repo and the working tree, on every platform.
+* text=auto eol=lf
+
+# Treat known binary types as binary (never apply EOL conversion).
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.dll  binary
+*.exe  binary
+*.pdb  binary
+*.snk  binary
