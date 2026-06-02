@@ -305,6 +305,30 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task ForgetDeviceAsync(DeviceViewModel device)
+    {
+        if (device.IsBusy) return;
+
+        device.IsBusy = true;
+        try
+        {
+            bool removed = await DeviceEnumerator.UnpairAsync(device.Model.AepId);
+            if (removed)
+            {
+                // It's gone now — drop it from the list (a refresh would do the same).
+                await RefreshAsync();
+            }
+            else
+            {
+                device.IsConfirmingForget = false;
+            }
+        }
+        finally
+        {
+            device.IsBusy = false;
+        }
+    }
+
     /// <summary>Merge in place by key so existing cards (and in-flight toggles) survive a refresh.</summary>
     private void MergeDevices(IReadOnlyList<BtDevice> latest)
     {
@@ -320,7 +344,7 @@ public sealed class MainViewModel : ObservableObject
             }
             else
             {
-                vm = new DeviceViewModel(model, ToggleDeviceAsync);
+                vm = new DeviceViewModel(model, ToggleDeviceAsync, ForgetDeviceAsync);
             }
             ordered.Add(vm);
         }

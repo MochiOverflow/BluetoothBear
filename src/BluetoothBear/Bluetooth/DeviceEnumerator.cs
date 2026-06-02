@@ -56,6 +56,25 @@ public static class DeviceEnumerator
             .ToList();
     }
 
+    /// <summary>Remove the pairing for a device ("forget"). Best effort; returns true if it's gone.</summary>
+    public static async Task<bool> UnpairAsync(string aepId)
+    {
+        if (string.IsNullOrEmpty(aepId)) return false;
+        try
+        {
+            var di = await DeviceInformation.CreateFromIdAsync(aepId);
+            if (!di.Pairing.IsPaired) return true;
+
+            var result = await di.Pairing.UnpairAsync();
+            return result.Status is DeviceUnpairingResultStatus.Unpaired
+                or DeviceUnpairingResultStatus.AlreadyUnpaired;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // Prefer connected entries, then ones that actually report battery.
     private static int Score(BtDevice d) => (d.IsConnected ? 2 : 0) + (d.BatteryPercent.HasValue ? 1 : 0);
 

@@ -114,10 +114,17 @@
                                  Foreground="{Binding BatteryPercent, Converter={StaticResource BatteryBrush}}"
                                  Visibility="{Binding HasBattery, Converter={StaticResource BoolToVis}}" />
 
-                    <Grid Margin="0,12,0,0">
-                        <TextBlock Text="{Binding StatusText}" Foreground="#6B7280" FontSize="12"
-                                   VerticalAlignment="Center" />
-                        <StackPanel HorizontalAlignment="Right">
+                    <!-- Actions -->
+                    <Grid Margin="0,12,0,0"
+                          Visibility="{Binding IsConfirmingForget, Converter={StaticResource InverseBoolToVis}}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding StatusText}" Foreground="#6B7280" FontSize="12"
+                                       VerticalAlignment="Center" />
+                            <Button Content="Forget" Style="{StaticResource LinkButton}" Foreground="#9CA3AF"
+                                    Margin="12,0,0,0" VerticalAlignment="Center"
+                                    Command="{Binding RequestForgetCommand}" />
+                        </StackPanel>
+                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                             <Button Content="Connect" Style="{StaticResource CardButton}"
                                     Background="#2563EB" Foreground="White"
                                     Command="{Binding ToggleCommand}"
@@ -126,6 +133,21 @@
                                     Background="#EEF0F3" Foreground="#374151"
                                     Command="{Binding ToggleCommand}"
                                     Visibility="{Binding IsConnected, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Forget confirmation -->
+                    <Grid Margin="0,12,0,0"
+                          Visibility="{Binding IsConfirmingForget, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="Forget this device?" Foreground="#374151" FontSize="12"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                            <Button Content="Cancel" Style="{StaticResource CardButton}"
+                                    Background="#EEF0F3" Foreground="#374151" Margin="0,0,8,0"
+                                    Command="{Binding CancelForgetCommand}" />
+                            <Button Content="Forget" Style="{StaticResource CardButton}"
+                                    Background="#EF4444" Foreground="White"
+                                    Command="{Binding ConfirmForgetCommand}" />
                         </StackPanel>
                     </Grid>
                 </StackPanel>

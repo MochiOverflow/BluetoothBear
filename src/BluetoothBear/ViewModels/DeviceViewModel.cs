@@ -6,18 +6,39 @@ namespace BluetoothBear.ViewModels;
 public sealed class DeviceViewModel : ObservableObject
 {
     private readonly Func<DeviceViewModel, Task> _toggle;
+    private readonly Func<DeviceViewModel, Task> _forget;
     private BtDevice _model;
     private bool _isBusy;
+    private bool _isConfirmingForget;
 
-    public DeviceViewModel(BtDevice model, Func<DeviceViewModel, Task> toggle)
+    public DeviceViewModel(BtDevice model, Func<DeviceViewModel, Task> toggle, Func<DeviceViewModel, Task> forget)
     {
         _model = model;
         _toggle = toggle;
+        _forget = forget;
         Key = KeyOf(model);
         ToggleCommand = new AsyncRelayCommand(() => _toggle(this), () => !IsBusy && _model.HasAddress);
+        RequestForgetCommand = new RelayCommand(() => IsConfirmingForget = true, () => !IsBusy);
+        CancelForgetCommand = new RelayCommand(() => IsConfirmingForget = false);
+        ConfirmForgetCommand = new AsyncRelayCommand(() => _forget(this), () => !IsBusy);
     }
 
     public AsyncRelayCommand ToggleCommand { get; }
+
+    /// <summary>Show the inline "Forget this device?" confirmation.</summary>
+    public RelayCommand RequestForgetCommand { get; }
+
+    /// <summary>Back out of the forget confirmation.</summary>
+    public RelayCommand CancelForgetCommand { get; }
+
+    /// <summary>Actually remove the pairing.</summary>
+    public AsyncRelayCommand ConfirmForgetCommand { get; }
+
+    public bool IsConfirmingForget
+    {
+        get => _isConfirmingForget;
+        set => Set(ref _isConfirmingForget, value);
+    }
 
     /// <summary>Stable identity across refreshes (MAC address if known, else the AEP id).</summary>
     public string Key { get; private set; }
@@ -47,6 +68,8 @@ public sealed class DeviceViewModel : ObservableObject
             {
                 Raise(nameof(StatusText));
                 ToggleCommand.RaiseCanExecuteChanged();
+                RequestForgetCommand.RaiseCanExecuteChanged();
+                ConfirmForgetCommand.RaiseCanExecuteChanged();
             }
         }
     }
