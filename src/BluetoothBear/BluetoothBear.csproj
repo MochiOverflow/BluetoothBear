@@ -17,6 +17,17 @@
     <Description>BluetoothBear - a Windows tray app to connect Bluetooth devices and see battery status.</Description>
   </PropertyGroup>
 
+  <!-- `dotnet publish -c Release` produces one self-contained .exe that needs no .NET install.
+       WPF uses reflection, so trimming is intentionally left off. For a small exe that relies on
+       the installed .NET 9 Desktop Runtime instead, publish with self-contained turned off. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
   <!-- Mixing WinForms (tray) + WPF (window): drop the clashing global usings
        (Application, Brush, Color exist in both). Files that need them import explicitly. -->
   <ItemGroup>
